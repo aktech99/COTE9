@@ -1,3 +1,4 @@
+import 'package:cote/screens/teacher_shorts_upload.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -15,6 +16,7 @@ import 'screens/StudentQuizPage.dart';
 import 'screens/ExtractTextPage.dart';
 import 'screens/profile_screen.dart';
 import 'screens/bookmarks_screen.dart';
+import 'screens/result_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,6 +52,7 @@ class MyApp extends StatelessWidget {
         '/ExtractTextPage': (context) => ExtractTextPage(url: ''),
         '/profile': (context) => const ProfileScreen(),
         '/bookmarks': (context) => const BookmarksScreen(),
+        '/uploadShort': (context) => const TeacherShortsUpload(),
       },
     );
   }

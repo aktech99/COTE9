@@ -32,6 +32,8 @@ dependencies:
   file_selector: ^0.9.3
   flutter_pdfview: ^1.0.0
   path_provider: ^2.1.1
+  cached_network_image: ^3.3.1
+
 
   # HTTP package to ensure compatibility with googleapis_auth
   http: ^1.0.0
@@ -56,7 +58,7 @@ flutter:
 
   # Uncomment this section to add assets for your app.
   assets:
-    - assets/service_account.json  # Add the service account file here
+    - assets/service-account.json  # Add the service account file here
 
   # Fonts (if any)
   # fonts:
