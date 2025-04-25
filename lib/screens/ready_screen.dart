@@ -31,6 +31,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
   bool isReady = false;
   bool isOpponentReady = false;
   String? opponentId;
+  String? opponentUsername;
   StreamSubscription<DocumentSnapshot>? _battleSubscription;
   bool isNavigating = false;
 
@@ -46,75 +47,75 @@ class _ReadyScreenState extends State<ReadyScreen> {
       firestore = FirebaseFirestore.instance;
       print("Using default Firestore instance: $e");
     }
-    
+
     _listenToBattleChanges();
   }
 
   void _listenToBattleChanges() {
     final battleRef = firestore.collection('quizBattles').doc(widget.battleId);
-    
-    _battleSubscription = battleRef.snapshots().listen((snapshot) {
+
+    _battleSubscription = battleRef.snapshots().listen((snapshot) async {
       if (!snapshot.exists || !mounted) return;
-      
+
       final data = snapshot.data()!;
       final List<String> players = List<String>.from(data['players'] ?? []);
       final Map<String, dynamic> playerReady = Map<String, dynamic>.from(data['playerReady'] ?? {});
       final bool started = data['started'] ?? false;
-      
-      // Find opponent ID
+
+      // Find opponent ID and fetch username
       for (final playerId in players) {
         if (playerId != uid) {
           opponentId = playerId;
+
+          // 👇 Fetch opponent's username
+          final doc = await firestore.collection('users').doc(opponentId).get();
+          final userData = doc.data();
+          if (userData != null) {
+            opponentUsername = userData['username'] ?? 'Opponent';
+          }
+
           break;
         }
       }
-      
+
       // Check if opponent is ready
       bool opponentReadyState = false;
       if (opponentId != null && playerReady.containsKey(opponentId)) {
         opponentReadyState = playerReady[opponentId] ?? false;
       }
-      
+
       setState(() {
         isOpponentReady = opponentReadyState;
       });
-      
-      // If battle has started, navigate to BattleScreen
+
+      // Navigate if battle has started
       if (started && data['startTime'] != null && !isNavigating) {
         final startTime = (data['startTime'] as Timestamp).toDate();
-        
         _navigateToBattle(startTime);
       }
     }, onError: (error) {
       print("Error listening to battle updates: $error");
     });
   }
-  
+
   Future<void> _setReadyStatus(bool ready) async {
     setState(() {
       isReady = ready;
     });
-    
+
     try {
       final battleRef = firestore.collection('quizBattles').doc(widget.battleId);
       await battleRef.update({
         'playerReady.$uid': ready,
       });
-      
-      // Check if both players are ready and start the battle if so
+
+      // Start if all ready
       final snapshot = await battleRef.get();
       if (snapshot.exists) {
         final data = snapshot.data()!;
         final Map<String, dynamic> playerReady = Map<String, dynamic>.from(data['playerReady'] ?? {});
-        
-        bool allReady = true;
-        for (final entry in playerReady.entries) {
-          if (entry.value != true) {
-            allReady = false;
-            break;
-          }
-        }
-        
+        bool allReady = playerReady.values.every((status) => status == true);
+
         if (allReady && playerReady.length >= 2) {
           await battleRef.update({
             'started': true,
@@ -131,16 +132,16 @@ class _ReadyScreenState extends State<ReadyScreen> {
       }
     }
   }
-  
+
   void _navigateToBattle(DateTime startTime) {
     if (isNavigating) return;
-    
+
     setState(() {
       isNavigating = true;
     });
-    
+
     _battleSubscription?.cancel();
-    
+
     if (mounted) {
       Navigator.pushReplacement(
         context,
@@ -157,7 +158,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
       );
     }
   }
-  
+
   @override
   void dispose() {
     _battleSubscription?.cancel();
@@ -225,7 +226,10 @@ class _ReadyScreenState extends State<ReadyScreen> {
                   const SizedBox(width: 60),
                   Column(
                     children: [
-                      const Text("Opponent", style: TextStyle(fontSize: 16)),
+                      Text(
+                        opponentUsername != null ? opponentUsername! : "Opponent",
+                        style: const TextStyle(fontSize: 16),
+                      ),
                       const SizedBox(height: 8),
                       Container(
                         width: 80,

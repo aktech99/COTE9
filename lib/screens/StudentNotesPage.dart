@@ -1,3 +1,4 @@
+// IMPORTS SAME AS YOURS
 import 'package:cote/screens/PDFViewerPage.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,6 +9,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:synchronized/synchronized.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class StudentNotesPage extends StatefulWidget {
   const StudentNotesPage({super.key});
@@ -22,6 +24,9 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
   final DefaultCacheManager _cacheManager = DefaultCacheManager();
   final Lock _cacheLock = Lock();
   Set<String> _expandedNotes = {};
+
+  final user = FirebaseAuth.instance.currentUser;
+  final db = FirebaseFirestore.instanceFor(app: Firebase.app(), databaseId: "cote");
 
   @override
   void initState() {
@@ -72,13 +77,11 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
         if (_pdfCache.containsKey(url)) {
           return _pdfCache[url]!;
         }
-
         final fileInfo = await _cacheManager.getFileFromCache(url);
         if (fileInfo != null) {
           _pdfCache[url] = fileInfo.file;
           return fileInfo.file;
         }
-
         final fileInfo2 = await _cacheManager.downloadFile(url);
         _pdfCache[url] = fileInfo2.file;
         return fileInfo2.file;
@@ -86,6 +89,24 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
     } catch (e) {
       print('Error getting PDF: $e');
       rethrow;
+    }
+  }
+
+  Future<void> _bookmarkNote(String noteId) async {
+    if (user == null) return;
+    try {
+      final userRef = db.collection('users').doc(user!.uid);
+      await userRef.update({
+        'bookmarks.notes': FieldValue.arrayUnion([noteId])
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Note bookmarked successfully!')),
+      );
+    } catch (e) {
+      print('Error bookmarking note: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to bookmark note')),
+      );
     }
   }
 
@@ -103,9 +124,7 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
             );
           },
         );
-        
         pdfFile = await _getPDF(url);
-        
         if (context.mounted) {
           Navigator.of(context).pop();
         }
@@ -117,7 +136,7 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
           MaterialPageRoute(
             builder: (context) => PDFViewerPage(
               url: url,
-              cachedFile: pdfFile!, 
+              cachedFile: pdfFile!,
             ),
           ),
         );
@@ -134,11 +153,6 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final db = FirebaseFirestore.instanceFor(
-      app: Firebase.app(),
-      databaseId: "cote",
-    );
-
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -146,17 +160,6 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text("Student - View Notes"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              showSearch(
-                context: context,
-                delegate: NotesSearchDelegate(db: db),
-              );
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -166,29 +169,23 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
               decoration: InputDecoration(
                 hintText: 'Search notes...',
                 hintStyle: TextStyle(color: Colors.white70),
-                prefixIcon: const Icon(
-                  Icons.search, 
-                  color: Colors.white,
-                ),
+                prefixIcon: const Icon(Icons.search, color: Colors.white),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(25),
-                  borderSide: BorderSide(color: Colors.white24),
+                  borderSide: const BorderSide(color: Colors.white24),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(25),
-                  borderSide: BorderSide(color: Colors.white24),
+                  borderSide: const BorderSide(color: Colors.white24),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(25),
-                  borderSide: BorderSide(color: Colors.deepPurple, width: 2),
+                  borderSide: const BorderSide(color: Colors.deepPurple, width: 2),
                 ),
                 filled: true,
                 fillColor: Colors.white10,
               ),
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 16),
               cursorColor: Colors.deepPurple,
               onChanged: (value) {
                 setState(() {
@@ -199,9 +196,7 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
           ),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: db.collection('notes')
-                  .orderBy('timestamp', descending: true)
-                  .snapshots(),
+              stream: db.collection('notes').orderBy('timestamp', descending: true).snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
@@ -229,13 +224,8 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
                     return AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
                       child: Card(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                         child: InkWell(
                           onTap: () {
                             setState(() {
@@ -251,20 +241,14 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8.0),
                                 child: ListTile(
-                                  leading: const Icon(
-                                    Icons.picture_as_pdf,
-                                    color: Colors.deepPurple,
-                                    size: 36,
-                                  ),
+                                  leading: const Icon(Icons.picture_as_pdf, color: Colors.deepPurple, size: 36),
                                   title: Text(title),
                                   subtitle: Text(
                                     "${timestamp.day}/${timestamp.month}/${timestamp.year}",
                                     style: TextStyle(color: Colors.grey[600]),
                                   ),
                                   trailing: RotationTransition(
-                                    turns: AlwaysStoppedAnimation(
-                                      _expandedNotes.contains(noteId) ? 0.5 : 0.0,
-                                    ),
+                                    turns: AlwaysStoppedAnimation(_expandedNotes.contains(noteId) ? 0.5 : 0.0),
                                     child: const Icon(Icons.keyboard_arrow_down),
                                   ),
                                 ),
@@ -272,11 +256,7 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
                               AnimatedCrossFade(
                                 firstChild: Container(),
                                 secondChild: Padding(
-                                  padding: const EdgeInsets.only(
-                                    left: 16.0,
-                                    right: 16.0,
-                                    bottom: 16.0,
-                                  ),
+                                  padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
                                   child: Column(
                                     children: [
                                       const Divider(),
@@ -294,9 +274,7 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
                                                 shape: RoundedRectangleBorder(
                                                   borderRadius: BorderRadius.circular(25),
                                                 ),
-                                                padding: const EdgeInsets.symmetric(
-                                                  vertical: 12,
-                                                ),
+                                                padding: const EdgeInsets.symmetric(vertical: 12),
                                               ),
                                             ),
                                           ),
@@ -312,9 +290,23 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
                                                 shape: RoundedRectangleBorder(
                                                   borderRadius: BorderRadius.circular(25),
                                                 ),
-                                                padding: const EdgeInsets.symmetric(
-                                                  vertical: 12,
+                                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 16),
+                                          Expanded(
+                                            child: ElevatedButton.icon(
+                                              icon: const Icon(Icons.bookmark),
+                                              label: const Text("Bookmark"),
+                                              onPressed: () => _bookmarkNote(noteId),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.deepPurple,
+                                                foregroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(25),
                                                 ),
+                                                padding: const EdgeInsets.symmetric(vertical: 12),
                                               ),
                                             ),
                                           ),
@@ -356,86 +348,5 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
   void dispose() {
     _cacheManager.dispose();
     super.dispose();
-  }
-}
-
-class NotesSearchDelegate extends SearchDelegate<dynamic> {
-  final FirebaseFirestore db;
-
-  NotesSearchDelegate({required this.db});
-
-  @override
-  List<Widget> buildActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear),
-        onPressed: () {
-          query = '';
-        },
-      ),
-    ];
-  }
-
-  @override
-  Widget buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () {
-        close(context, null);
-      },
-    );
-  }
-
-  @override
-  Widget buildResults(BuildContext context) {
-    return _buildSearchResults();
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    return _buildSearchResults();
-  }
-
-  Widget _buildSearchResults() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: db.collection('notes')
-          .orderBy('timestamp', descending: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final notes = snapshot.data!.docs.where((doc) {
-          final title = doc['title'].toString().toLowerCase();
-          return title.contains(query.toLowerCase());
-        }).toList();
-
-        return ListView.builder(
-          itemCount: notes.length,
-          itemBuilder: (context, index) {
-            final note = notes[index];
-            return ListTile(
-              leading: const Icon(
-                Icons.picture_as_pdf,
-                color: Colors.deepPurple,
-              ),
-              title: Text(note['title']),
-              subtitle: Text(
-                _formatDate((note['timestamp'] as Timestamp).toDate()),
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              onTap: () {
-                close(context, note);
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    return "${date.day}/${date.month}/${date.year}";
   }
 }

@@ -268,16 +268,24 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: subjects.map((subject) {
-                          return Chip(
-                            label: Text(subject),
-                            backgroundColor: Colors.deepPurple.shade100,
-                          );
-                        }).toList(),
-                      ),
+                     Wrap(
+  spacing: 8,
+  runSpacing: 8,
+  children: subjects.map((subject) {
+    return Chip(
+      label: Text(
+        subject,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      backgroundColor: Colors.deepPurple,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    );
+  }).toList(),
+),
+
                     ],
                   ),
                 ),
