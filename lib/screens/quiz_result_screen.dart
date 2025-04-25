@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cote/screens/StudentNotesPage.dart';
 
 class QuizResultScreen extends StatefulWidget {
   final List<Map<String, dynamic>> result;
@@ -200,11 +201,15 @@ class _QuizResultScreenState extends State<QuizResultScreen> {
                     child: Text('View Answers'),
                   ),
                   ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pushAndRemoveUntil(
+                      context, 
+                      MaterialPageRoute(builder: (context) => const StudentNotesPage()), 
+                      (route) => false
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                     ),
-                    child: Text('Back to Quiz'),
+                    child: Text('Back to Notes'),
                   ),
                 ],
               ),

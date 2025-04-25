@@ -65,11 +65,11 @@ class LeaderboardPageState extends State<LeaderboardPage> {
               
               return _buildLeaderboardItem(
                 rank: index + 1,
-                email: userData['email'] ?? 'Unknown Email',
+                username: userData['username'] ?? 'Unknown User',
                 rating: userData['quizRating'] ?? 1200,
                 battlesWon: userData['quizBattlesWon'] ?? 0,
                 totalBattles: userData['quizBattlesPlayed'] ?? 0,
-                isCurrentUser: userData['email'] == _currentUser?.email,
+                isCurrentUser: userData['username'] == _currentUser?.displayName,
               );
             },
           );
@@ -80,7 +80,7 @@ class LeaderboardPageState extends State<LeaderboardPage> {
 
   Widget _buildLeaderboardItem({
     required int rank,
-    required String email,
+    required String username,
     required int rating,
     required int battlesWon,
     required int totalBattles,
@@ -112,7 +112,7 @@ class LeaderboardPageState extends State<LeaderboardPage> {
           children: [
             Expanded(
               child: Text(
-                email,
+                username,
                 style: TextStyle(
                   color: isCurrentUser ? Colors.deepPurple : Colors.white,
                   fontWeight: FontWeight.bold,
@@ -136,20 +136,6 @@ class LeaderboardPageState extends State<LeaderboardPage> {
             color: Colors.white70,
           ),
         ),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: _getRatingColor(rating).withOpacity(0.2),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            'Lvl ${_calculateLevel(rating)}',
-            style: TextStyle(
-              color: _getRatingColor(rating),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -158,11 +144,11 @@ class LeaderboardPageState extends State<LeaderboardPage> {
   Color _getRankColor(int rank) {
     switch (rank) {
       case 1:
-        return Color(0xFFFFD700); // Gold color
+        return const Color(0xFFFFD700); // Gold color
       case 2:
-        return Color(0xFFC0C0C0); // Silver color
+        return const Color(0xFFC0C0C0); // Silver color
       case 3:
-        return Color(0xFFCD7F32); // Bronze color
+        return const Color(0xFFCD7F32); // Bronze color
       default:
         return Colors.grey;
     }
@@ -175,10 +161,5 @@ class LeaderboardPageState extends State<LeaderboardPage> {
     if (rating < 1400) return Colors.blue;
     if (rating < 1600) return Colors.green;
     return Colors.purple;
-  }
-
-  // Calculate user level based on rating
-  int _calculateLevel(int rating) {
-    return (rating ~/ 100) + 1;
   }
 }

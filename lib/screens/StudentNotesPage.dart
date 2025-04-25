@@ -90,47 +90,48 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
   }
 
   Future<void> _viewPDF(BuildContext context, String url) async {
-  try {
-    File? pdfFile = _pdfCache[url];
-    
-    if (pdfFile == null) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
-        },
-      );
+    try {
+      File? pdfFile = _pdfCache[url];
       
-      pdfFile = await _getPDF(url);
-      
+      if (pdfFile == null) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          },
+        );
+        
+        pdfFile = await _getPDF(url);
+        
+        if (context.mounted) {
+          Navigator.of(context).pop();
+        }
+      }
+
+      if (context.mounted && pdfFile != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PDFViewerPage(
+              url: url,
+              cachedFile: pdfFile!, 
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error handling PDF: $e');
       if (context.mounted) {
-        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to open PDF')),
+        );
       }
     }
-
-    if (context.mounted && pdfFile != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PDFViewerPage(
-            url: url,
-            cachedFile: pdfFile!, // Add the ! operator here
-          ),
-        ),
-      );
-    }
-  } catch (e) {
-    print('Error handling PDF: $e');
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to open PDF')),
-      );
-    }
   }
-}
+
   @override
   Widget build(BuildContext context) {
     final db = FirebaseFirestore.instanceFor(
@@ -164,13 +165,31 @@ class _StudentNotesPageState extends State<StudentNotesPage> {
             child: TextField(
               decoration: InputDecoration(
                 hintText: 'Search notes...',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: TextStyle(color: Colors.white70),
+                prefixIcon: const Icon(
+                  Icons.search, 
+                  color: Colors.white,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(25),
+                  borderSide: BorderSide(color: Colors.white24),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(25),
+                  borderSide: BorderSide(color: Colors.white24),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(25),
+                  borderSide: BorderSide(color: Colors.deepPurple, width: 2),
                 ),
                 filled: true,
-                fillColor: Colors.grey[100],
+                fillColor: Colors.white10,
               ),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+              ),
+              cursorColor: Colors.deepPurple,
               onChanged: (value) {
                 setState(() {
                   _searchQuery = value.toLowerCase();
