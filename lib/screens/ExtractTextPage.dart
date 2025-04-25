@@ -1,11 +1,8 @@
-// ExtractTextPage.dart
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cote/screens/result_screen.dart';
- // Replace with actual path to ResultScreen.dart
+import 'package:cote/screens/quiz_result_screen.dart'; // Import the new result screen
 
 class ExtractTextPage extends StatefulWidget {
   final String url;
@@ -20,8 +17,7 @@ class _ExtractTextPageState extends State<ExtractTextPage> {
   List<Map<String, dynamic>> generatedQuestions = [];
   List<int?> selectedAnswers = [];
   bool isLoading = true;
-  final String geminiApiKey = "AIzaSyAw1u_V1Kfb-p-aU68lbGEBkB_LNBQmao4";
-
+  final String geminiApiKey = "AIzaSyAw1u_V1Kfb-p-aU68lbGEBkB_LNBQmao4"; // Replace with your actual API key
   // Get reference to the custom Firestore database
   final db = FirebaseFirestore.instanceFor(
     app: Firebase.app(),
@@ -36,6 +32,10 @@ class _ExtractTextPageState extends State<ExtractTextPage> {
 
   Future<void> _generateQuizFromStoredText() async {
     try {
+      setState(() {
+        isLoading = true;
+      });
+
       final querySnapshot = await db
           .collection('notes')
           .where('url', isEqualTo: widget.url)
@@ -148,8 +148,19 @@ class _ExtractTextPageState extends State<ExtractTextPage> {
     });
   }
 
+  bool _areAllQuestionsAnswered() {
+    return !selectedAnswers.contains(null);
+  }
+
   void _submitQuiz() {
-    // Prepare result data in the format ResultScreen expects
+    if (!_areAllQuestionsAnswered()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please answer all questions')),
+      );
+      return;
+    }
+
+    // Prepare result data
     List<Map<String, dynamic>> result = [];
     
     for (int i = 0; i < generatedQuestions.length; i++) {
@@ -161,19 +172,18 @@ class _ExtractTextPageState extends State<ExtractTextPage> {
       });
     }
 
-    // Navigate to ResultScreen
+    // Navigate to QuizResultScreen
     Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (context) => ResultScreen(
-      result: result,
-      battleId: 'some-battle-id', // 👈 pass the actual battle ID here
-      uid: 'user-uid',            // 👈 pass the current user's UID here
-    ),
-  ),
-);
-
-}
+      context,
+      MaterialPageRoute(
+        builder: (context) => QuizResultScreen(
+          result: result,
+          battleId: DateTime.now().millisecondsSinceEpoch.toString(),
+          uid: 'current_user_id', // Replace with actual user ID
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -250,7 +260,7 @@ class _ExtractTextPageState extends State<ExtractTextPage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _submitQuiz,
+                          onPressed: _areAllQuestionsAnswered() ? _submitQuiz : null,
                           style: ElevatedButton.styleFrom(
                             padding: EdgeInsets.symmetric(vertical: 15),
                           ),

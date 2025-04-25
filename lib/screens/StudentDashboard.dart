@@ -1,6 +1,10 @@
 import 'package:cote/screens/leaderboards_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
 
 class StudentDashboard extends StatelessWidget {
   const StudentDashboard({super.key});
@@ -63,14 +67,30 @@ class StudentDashboard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                'Welcome, Student!',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
+
+              /// 👇 Username fetch from Firestore
+              FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instanceFor(
+                  app: Firebase.app(),
+                  databaseId: "cote",
+                ).collection('users').doc(FirebaseAuth.instance.currentUser!.uid).get(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const CircularProgressIndicator(color: Colors.white);
+                  }
+                  final data = snapshot.data!.data() as Map<String, dynamic>;
+                  final username = data['username'] ?? 'Student';
+                  return Text(
+                    'Welcome, $username!',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  );
+                },
               ),
+
               const SizedBox(height: 40),
               Expanded(
                 child: GridView.count(
