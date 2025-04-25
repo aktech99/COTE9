@@ -86,6 +86,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // User Basic Info
+              Text(
+                "Username: ${_userData!['username'] ?? 'Not set'}",
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 8),
               Text("Email: ${_userData!['email']}", style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 8),
               Text("Role: ${_userData!['role']}", style: const TextStyle(fontSize: 16)),
@@ -186,5 +191,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _subjectController.dispose();
+    super.dispose();
   }
 }

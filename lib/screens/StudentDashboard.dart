@@ -2,12 +2,52 @@ import 'package:cote/screens/leaderboards_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/material.dart';
 
-class StudentDashboard extends StatelessWidget {
+class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
+
+  @override
+  _StudentDashboardState createState() => _StudentDashboardState();
+}
+
+class _StudentDashboardState extends State<StudentDashboard> {
+  String _username = 'Student';
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUsername();
+  }
+
+  Future<void> _fetchUsername() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        final doc = await FirebaseFirestore.instanceFor(
+          app: Firebase.app(),
+          databaseId: "cote",
+        ).collection('users').doc(currentUser.uid).get();
+
+        if (mounted) {
+          setState(() {
+            _username = doc.data()?['username'] ?? 'Student';
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching username: $e')),
+        );
+      }
+    }
+  }
 
   // Logout function
   Future<void> _logout(BuildContext context) async {
@@ -68,28 +108,17 @@ class StudentDashboard extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              /// 👇 Username fetch from Firestore
-              FutureBuilder<DocumentSnapshot>(
-                future: FirebaseFirestore.instanceFor(
-                  app: Firebase.app(),
-                  databaseId: "cote",
-                ).collection('users').doc(FirebaseAuth.instance.currentUser!.uid).get(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const CircularProgressIndicator(color: Colors.white);
-                  }
-                  final data = snapshot.data!.data() as Map<String, dynamic>;
-                  final username = data['username'] ?? 'Student';
-                  return Text(
-                    'Welcome, $username!',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+              // Username display with loading state
+              _isLoading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : Text(
+                      'Welcome, $_username!',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  );
-                },
-              ),
 
               const SizedBox(height: 40),
               Expanded(
