@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -59,6 +60,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadUserProfile();
   }
 
+  // Rating color coding method
+  Color _getRatingColor(int rating) {
+    if (rating < 1000) return Colors.red;
+    if (rating < 1200) return Colors.orange;
+    if (rating < 1400) return Colors.blue;
+    if (rating < 1600) return Colors.green;
+    return Colors.purple;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -69,49 +79,111 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text("Profile")),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Email: ${_userData!['email']}", style: const TextStyle(fontSize: 16)),
-            const SizedBox(height: 8),
-            Text("Role: ${_userData!['role']}", style: const TextStyle(fontSize: 16)),
-            const SizedBox(height: 16),
-            const Text("Subjects:", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Wrap(
-              spacing: 8,
-              children: List<Widget>.from(
-                _userData!['subjects'].map<Widget>(
-                  (subject) => Chip(
-                    label: Text(subject),
-                    deleteIcon: _userData!['role'] == 'student'
-                        ? const Icon(Icons.close)
-                        : null,
-                    onDeleted: _userData!['role'] == 'student'
-                        ? () => _removeSubject(subject)
-                        : null,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // User Basic Info
+              Text("Email: ${_userData!['email']}", style: const TextStyle(fontSize: 16)),
+              const SizedBox(height: 8),
+              Text("Role: ${_userData!['role']}", style: const TextStyle(fontSize: 16)),
+              
+              // Rating Section
+              const SizedBox(height: 16),
+              Text(
+                "Quiz Rating: ${_userData!['quizRating'] ?? 1200}",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: _getRatingColor(_userData!['quizRating'] ?? 1200),
+                ),
+              ),
+
+              // Battle Statistics
+              const SizedBox(height: 16),
+              const Text(
+                "Battle Statistics",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              _buildStatItem(
+                "Battles Played", 
+                _userData!['quizBattlesPlayed'] ?? 0
+              ),
+              _buildStatItem(
+                "Battles Won", 
+                _userData!['quizBattlesWon'] ?? 0
+              ),
+              _buildStatItem(
+                "Battles Lost", 
+                _userData!['quizBattlesLost'] ?? 0
+              ),
+              _buildStatItem(
+                "Total Points Earned", 
+                _userData!['totalPointsEarned'] ?? 0
+              ),
+
+              // Subjects Section
+              const SizedBox(height: 16),
+              const Text("Subjects:", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Wrap(
+                spacing: 8,
+                children: List<Widget>.from(
+                  _userData!['subjects'].map<Widget>(
+                    (subject) => Chip(
+                      label: Text(subject),
+                      deleteIcon: _userData!['role'] == 'student'
+                          ? const Icon(Icons.close)
+                          : null,
+                      onDeleted: _userData!['role'] == 'student'
+                          ? () => _removeSubject(subject)
+                          : null,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _subjectController,
-                    decoration: const InputDecoration(hintText: "Add new subject"),
+              const SizedBox(height: 12),
+              
+              // Add Subject Section
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _subjectController,
+                      decoration: const InputDecoration(hintText: "Add new subject"),
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.add),
-                  onPressed: _addSubject,
-                )
-              ],
-            ),
-          ],
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: _addSubject,
+                  )
+                ],
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  // Helper method to build stat items
+  Widget _buildStatItem(String label, int value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 16)),
+          Text(
+            value.toString(), 
+            style: const TextStyle(
+              fontSize: 16, 
+              fontWeight: FontWeight.bold
+            )
+          ),
+        ],
       ),
     );
   }

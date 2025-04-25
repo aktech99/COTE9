@@ -1,5 +1,6 @@
+import 'package:cote/screens/leaderboards_page.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Import for logout functionality
+import 'package:firebase_auth/firebase_auth.dart';
 
 class StudentDashboard extends StatelessWidget {
   const StudentDashboard({super.key});
@@ -103,9 +104,26 @@ class StudentDashboard extends StatelessWidget {
                       onTap: () => Navigator.pushNamed(context, '/profile'),
                     ),
                     DashboardCard(
-                      label: "Logout",
-                      icon: Icons.logout,
-                      onTap: () => _logout(context),
+                      label: "Leaderboard",
+                      icon: Icons.leaderboard,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          PageRouteBuilder(
+                            pageBuilder: (context, animation, secondaryAnimation) => const LeaderboardPage(),
+                            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                              var begin = const Offset(1.0, 0.0);
+                              var end = Offset.zero;
+                              var curve = Curves.easeInOut;
+                              var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                              return SlideTransition(
+                                position: animation.drive(tween),
+                                child: child,
+                              );
+                            },
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
