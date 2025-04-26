@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
 import 'result_screen.dart';
 
 class BattleScreen extends StatefulWidget {
@@ -12,7 +11,6 @@ class BattleScreen extends StatefulWidget {
   final String teamCode;
   final String battleId;
   final DateTime startTime;
-  final List<Map<String, dynamic>>? preGeneratedQuestions;
 
   const BattleScreen({
     super.key,
@@ -21,7 +19,6 @@ class BattleScreen extends StatefulWidget {
     required this.teamCode,
     required this.battleId,
     required this.startTime,
-    this.preGeneratedQuestions,
   });
 
   @override
@@ -30,6 +27,7 @@ class BattleScreen extends StatefulWidget {
 
 class _BattleScreenState extends State<BattleScreen> {
   List<Map<String, dynamic>> questions = [];
+  List<Map<String, dynamic>> originalQuestions = [];
   Map<int, int?> selectedAnswers = {};
   int remainingSeconds = 60;
   Timer? timer;
@@ -37,7 +35,6 @@ class _BattleScreenState extends State<BattleScreen> {
   String errorMessage = '';
   final uid = FirebaseAuth.instance.currentUser!.uid;
 
-  // Get reference to the custom Firestore database
   late final FirebaseFirestore db;
   StreamSubscription<DocumentSnapshot>? _battleSubscription;
 
@@ -54,16 +51,52 @@ class _BattleScreenState extends State<BattleScreen> {
       print("Using default Firestore instance: $e");
     }
     
-    // Use pre-generated questions if available
-    if (widget.preGeneratedQuestions != null) {
+    _loadQuestions();
+  }
+
+  Future<void> _loadQuestions() async {
+    try {
+      final battleDoc = await db.collection('quizBattles').doc(widget.battleId).get();
+      final data = battleDoc.data();
+      
+      if (data != null && data.containsKey('questions')) {
+        setState(() {
+          originalQuestions = List<Map<String, dynamic>>.from(data['questions'] ?? []);
+          
+          // Create a copy of questions without any indication of correct answer
+          questions = originalQuestions.map((q) {
+            final newQ = Map<String, dynamic>.from(q);
+            // Remove any markers or indicators of correct answer
+            newQ.remove('correctAnswer');
+            
+            // Optionally, remove any '[CORRECT]' or similar markers from options
+            final options = List<String>.from(newQ['options']);
+            newQ['options'] = options.map((option) {
+              // Remove any '[CORRECT]' or similar markers
+              return option.replaceAll('[CORRECT]', '').trim();
+            }).toList();
+            
+            return newQ;
+          }).toList();
+          
+          // Initialize selected answers
+          for (int i = 0; i < questions.length; i++) {
+            selectedAnswers[i] = null;
+          }
+          
+          isLoading = false;
+        });
+        
+        _startTimer();
+      } else {
+        throw Exception('No questions found');
+      }
+    } catch (e) {
+      print("Error loading questions: $e");
       setState(() {
-        questions = widget.preGeneratedQuestions!;
         isLoading = false;
+        errorMessage = "Failed to load questions: ${e.toString()}";
       });
-      _startTimer();
-    } else {
-      // Fallback to original generation method
-      _generateQuizFromStoredText();
     }
   }
 
@@ -93,171 +126,13 @@ class _BattleScreenState extends State<BattleScreen> {
     });
   }
 
-  Future<void> _generateQuizFromStoredText() async {
-    try {
-      // Get the stored extracted text from Firestore
-      final querySnapshot = await db
-          .collection('notes')
-          .where('url', isEqualTo: widget.noteUrl)
-          .get();
-
-      if (querySnapshot.docs.isEmpty) {
-        throw Exception('Document not found');
-      }
-
-      final doc = querySnapshot.docs.first;
-      final String extractedText = doc['extractedText'];
-
-      if (extractedText.isEmpty) {
-        throw Exception('No extracted text found');
-      }
-
-      // Generate MCQs from the stored text
-      await _generateMCQs(extractedText);
-
-      if (!mounted) return;
-      
-      setState(() => isLoading = false);
-      _startTimer(); // Start timer after questions are ready
-    } catch (e) {
-      print("Error generating quiz: $e");
-      if (!mounted) return;
-      
-      setState(() {
-        isLoading = false;
-        errorMessage = "Failed to generate quiz: ${e.toString()}";
-      });
-    }
-  }
-
-  Future<void> _generateMCQs(String text) async {
-    try {
-      const apiKey = "AIzaSyAw1u_V1Kfb-p-aU68lbGEBkB_LNBQmao4";
-      final model = GenerativeModel(
-        model: 'gemini-1.5-flash',
-        apiKey: apiKey,
-      );
-
-      final truncatedText = text.length > 30000 ? text.substring(0, 30000) : text;
-
-      final prompt = """
-Generate 5 multiple-choice questions from this text. Format:
-Q1: [Question]
-A: [Option 1]
-B: [Option 2]
-C: [Option 3] [CORRECT]
-D: [Option 4]
-
-$truncatedText
-""";
-
-      final res = await model.generateContent([Content.text(prompt)]);
-      final raw = res.text ?? "";
-      
-      if (raw.isEmpty) {
-        throw Exception("Generated no content from Gemini");
-      }
-      
-      final parsed = _parseMCQs(raw);
-      
-      if (parsed.isEmpty) {
-        throw Exception("Failed to parse questions from Gemini response");
-      }
-      
-      if (!mounted) return;
-      
-      setState(() {
-        questions = parsed;
-        for (int i = 0; i < questions.length; i++) {
-          selectedAnswers[i] = null;
-        }
-      });
-    } catch (e) {
-      print("Error generating MCQs: $e");
-      rethrow;
-    }
-  }
-
-  List<Map<String, dynamic>> _parseMCQs(String raw) {
-    final List<Map<String, dynamic>> output = [];
-  
-    try {
-      // Split the raw text into potential question blocks
-      final questionBlocks = raw.split(RegExp(r'Q\d+:|Question \d+:'));
-      
-      for (var block in questionBlocks.skip(1)) {  // Skip first empty element
-        final lines = block.trim().split('\n');
-        
-        if (lines.isEmpty) continue;
-        
-        // Extract question
-        final question = lines[0].trim();
-        final options = <String>[];
-        int correctAnswerIndex = -1;
-        
-        // Parse options
-        for (int i = 1; i < lines.length; i++) {
-          final line = lines[i].trim();
-          if (line.isEmpty) continue;
-          
-          // Extract option text, handling various formats
-          final optionMatch = RegExp(r'^([A-D])[\s:\.\)]+(.+?)(\s*$$CORRECT$$)?$').firstMatch(line);
-          
-          if (optionMatch != null) {
-            final optionText = optionMatch.group(2)!.trim();
-            options.add(optionText);
-            
-            // Check for explicit correct answer marking
-            if (line.contains('[CORRECT]') || 
-                line.contains('(correct)') || 
-                line.contains('✓')) {
-              correctAnswerIndex = options.length - 1;
-            }
-          }
-          
-          // Limit to 4 options
-          if (options.length == 4) break;
-        }
-        
-        // If no explicit correct answer found, default to first option
-        if (correctAnswerIndex == -1 && options.length == 4) {
-          correctAnswerIndex = 0;
-        }
-        
-        // Only add if we have a valid question and 4 options
-        if (question.isNotEmpty && 
-            options.length == 4 && 
-            correctAnswerIndex != -1) {
-          output.add({
-            'question': question,
-            'options': options,
-            'correctAnswer': correctAnswerIndex,
-          });
-        }
-      }
-    } catch (e) {
-      print("Error parsing MCQs: $e");
-    }
-    
-    // If no questions parsed, return a default set of questions
-    return output.isNotEmpty 
-      ? output 
-      : [
-          {
-            'question': 'No questions could be generated',
-            'options': ['A', 'B', 'C', 'D'],
-            'correctAnswer': 0,
-          }
-        ];
-  }
-
   Future<void> _submit() async {
     timer?.cancel();
 
     // Calculate score
     int correctCount = 0;
     for (int i = 0; i < questions.length; i++) {
-      if (selectedAnswers[i] == questions[i]['correctAnswer']) {
+      if (selectedAnswers[i] == originalQuestions[i]['correctAnswer']) {
         correctCount++;
       }
     }
@@ -271,11 +146,11 @@ $truncatedText
           'score': correctCount,
           'completedAt': FieldValue.serverTimestamp(),
           'answers': selectedAnswers.map((key, value) => MapEntry(key.toString(), value)),
-          'submitted': true,  // Add a submitted flag
+          'submitted': true,
         },
       });
 
-      // Listen for opponent's submission
+      // Wait for opponent's submission
       _waitForOpponentSubmission();
     } catch (e) {
       print("Error updating player data: $e");
@@ -292,15 +167,6 @@ $truncatedText
       final Map<String, dynamic> playerData = Map<String, dynamic>.from(data['playerData'] ?? {});
       final List<String> players = List<String>.from(data['players'] ?? []);
       
-      // Find opponent ID
-      String? opponentId;
-      for (final playerId in players) {
-        if (playerId != uid) {
-          opponentId = playerId;
-          break;
-        }
-      }
-      
       // Check if both players have submitted
       bool allSubmitted = players.every((playerId) => 
         playerData[playerId] != null && 
@@ -310,14 +176,14 @@ $truncatedText
       if (allSubmitted) {
         _battleSubscription?.cancel();
         
-        // Prepare result data
+        // Prepare result data with correct answers
         final results = questions.asMap().entries.map((entry) {
           final index = entry.key;
           final q = entry.value;
           return {
             'question': q['question'],
             'options': q['options'],
-            'correctAnswer': q['correctAnswer'],
+            'correctAnswer': originalQuestions[index]['correctAnswer'],
             'selectedAnswer': selectedAnswers[index],
           };
         }).toList();
@@ -390,7 +256,7 @@ $truncatedText
                               isLoading = true;
                               errorMessage = '';
                             });
-                            _generateQuizFromStoredText();
+                            _loadQuestions();
                           },
                           child: const Text("Try Again"),
                         ),

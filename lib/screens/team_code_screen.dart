@@ -56,14 +56,27 @@ class _TeamCodeScreenState extends State<TeamCodeScreen> {
     });
 
     try {
-      // Generate quiz questions BEFORE creating the battle
-      final questions = await _generateQuizQuestions();
+      // Get the stored extracted text from Firestore
+      final noteSnapshot = await firestore
+          .collection('notes')
+          .where('url', isEqualTo: widget.noteUrl)
+          .get();
+
+      if (noteSnapshot.docs.isEmpty) {
+        throw Exception('Note not found');
+      }
+
+      final noteDoc = noteSnapshot.docs.first;
+      final String extractedText = noteDoc['extractedText'];
+
+      // Generate quiz questions
+      final questions = await _generateQuizQuestions(extractedText);
 
       // First, check if a battle with this team code already exists
       final querySnapshot = await firestore
           .collection('quizBattles')
           .where('teamCode', isEqualTo: code)
-          .where('started', isEqualTo: false)  // Only find battles that haven't started
+          .where('started', isEqualTo: false)
           .get();
       
       String battleId;
@@ -76,7 +89,6 @@ class _TeamCodeScreenState extends State<TeamCodeScreen> {
         List players = List<String>.from(data['players'] ?? []);
         
         if (players.contains(uid)) {
-          // User already joined this battle
           print("User already in this battle");
         } else if (players.length < 2) {
           // Add user to existing battle
@@ -87,7 +99,7 @@ class _TeamCodeScreenState extends State<TeamCodeScreen> {
           await firestore.collection('quizBattles').doc(battleId).update({
             'players': players,
             'playerReady': playerReady,
-            'questions': questions,  // Store pre-generated questions
+            'questions': questions,
           });
         } else {
           // Battle is full
@@ -117,11 +129,11 @@ class _TeamCodeScreenState extends State<TeamCodeScreen> {
           'completed': false,
           'winner': null,
           'playerData': {},
-          'questions': questions,  // Store pre-generated questions
+          'questions': questions,
         });
       }
 
-      // Navigate to the ReadyScreen with pre-generated questions
+      // Navigate to the ReadyScreen
       if (mounted) {
         setState(() {
           isJoining = false;
@@ -135,7 +147,6 @@ class _TeamCodeScreenState extends State<TeamCodeScreen> {
               noteUrl: widget.noteUrl,
               teamCode: code,
               battleId: battleId,
-              preGeneratedQuestions: questions,  // Pass pre-generated questions
             ),
           ),
         );
@@ -153,25 +164,8 @@ class _TeamCodeScreenState extends State<TeamCodeScreen> {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _generateQuizQuestions() async {
+  Future<List<Map<String, dynamic>>> _generateQuizQuestions(String extractedText) async {
     try {
-      // Get the stored extracted text from Firestore
-      final querySnapshot = await firestore
-          .collection('notes')
-          .where('url', isEqualTo: widget.noteUrl)
-          .get();
-
-      if (querySnapshot.docs.isEmpty) {
-        throw Exception('Document not found');
-      }
-
-      final doc = querySnapshot.docs.first;
-      final String extractedText = doc['extractedText'];
-
-      if (extractedText.isEmpty) {
-        throw Exception('No extracted text found');
-      }
-
       // Generate MCQs using Gemini
       const apiKey = "AIzaSyAw1u_V1Kfb-p-aU68lbGEBkB_LNBQmao4";
       final model = GenerativeModel(

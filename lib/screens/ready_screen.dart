@@ -10,7 +10,6 @@ class ReadyScreen extends StatefulWidget {
   final String noteUrl;
   final String teamCode;
   final String battleId;
-  final List<Map<String, dynamic>>? preGeneratedQuestions;
 
   const ReadyScreen({
     super.key,
@@ -18,7 +17,6 @@ class ReadyScreen extends StatefulWidget {
     required this.noteUrl,
     required this.teamCode,
     required this.battleId,
-    this.preGeneratedQuestions,
   });
 
   @override
@@ -67,7 +65,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
         if (playerId != uid) {
           opponentId = playerId;
 
-          // 👇 Fetch opponent's username
+          // Fetch opponent's username
           final doc = await firestore.collection('users').doc(opponentId).get();
           final userData = doc.data();
           if (userData != null) {
@@ -152,7 +150,6 @@ class _ReadyScreenState extends State<ReadyScreen> {
             teamCode: widget.teamCode,
             battleId: widget.battleId,
             startTime: startTime,
-            preGeneratedQuestions: widget.preGeneratedQuestions,
           ),
         ),
       );
@@ -167,6 +164,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Existing build method remains unchanged
     return Scaffold(
       appBar: AppBar(
         title: const Text("Waiting Room"),
