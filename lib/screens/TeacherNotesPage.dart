@@ -104,7 +104,7 @@ class _TeacherNotesPageState extends State<TeacherNotesPage> {
 
   Future<http.Client> _getAuthClient() async {
     try {
-      final jsonString = await rootBundle.loadString('assets/service_account.json');
+      final jsonString = await rootBundle.loadString('assets/service-account.json');
       final jsonMap = json.decode(jsonString) as Map<String, dynamic>;
       final credentials = ServiceAccountCredentials.fromJson(jsonMap);
       final scopes = ['https://www.googleapis.com/auth/cloud-vision'];

@@ -9,11 +9,7 @@ class ShortViewerPage extends StatefulWidget {
   final int initialIndex;
   final List<QueryDocumentSnapshot> docs;
 
-  const ShortViewerPage({
-    super.key,
-    required this.initialIndex,
-    required this.docs,
-  });
+  const ShortViewerPage({super.key, required this.initialIndex, required this.docs});
 
   @override
   State<ShortViewerPage> createState() => _ShortViewerPageState();
@@ -28,11 +24,7 @@ class _ShortViewerPageState extends State<ShortViewerPage> {
   double _sliderValue = 0.0;
   Timer? _positionTimer;
 
-  final db = FirebaseFirestore.instanceFor(
-    app: Firebase.app(),
-    databaseId: "cote",
-  );
-
+  final db = FirebaseFirestore.instanceFor(app: Firebase.app(), databaseId: "cote");
   final userId = FirebaseAuth.instance.currentUser!.uid;
 
   @override
@@ -48,6 +40,7 @@ class _ShortViewerPageState extends State<ShortViewerPage> {
 
   void _startPositionUpdater() {
     _positionTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (!mounted) return;
       final controller = _videoControllers[_currentIndex];
       if (controller != null && controller.value.isInitialized && !_isSeeking) {
         setState(() {
@@ -64,14 +57,11 @@ class _ShortViewerPageState extends State<ShortViewerPage> {
     try {
       final controller = VideoPlayerController.network(url, videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true));
       _videoControllers[index] = controller;
-
       controller.initialize().then((_) {
         if (mounted) {
           setState(() {
             controller.setLooping(true);
-            if (index == _currentIndex) {
-              controller.play();
-            }
+            if (index == _currentIndex) controller.play();
           });
         }
       });
@@ -97,7 +87,6 @@ class _ShortViewerPageState extends State<ShortViewerPage> {
 
   void _onPageChanged(int newIndex) {
     if (newIndex == _currentIndex) return;
-
     _videoControllers[_currentIndex]?.pause();
     setState(() {
       _currentIndex = newIndex;
@@ -118,10 +107,7 @@ class _ShortViewerPageState extends State<ShortViewerPage> {
   void _togglePlayPause() {
     final controller = _videoControllers[_currentIndex];
     if (controller == null) return;
-
-    setState(() {
-      controller.value.isPlaying ? controller.pause() : controller.play();
-    });
+    setState(() => controller.value.isPlaying ? controller.pause() : controller.play());
   }
 
   void _toggleControls() {
@@ -162,30 +148,29 @@ class _ShortViewerPageState extends State<ShortViewerPage> {
     }
   }
 
-  Future<void> _toggleBookmark(String userId, String shortId) async {
+  Future<void> _toggleBookmark(String shortId) async {
     final userDocRef = db.collection('users').doc(userId);
     final userDoc = await userDocRef.get();
 
     if (!userDoc.exists) {
       await userDocRef.set({
-        'bookmarks': {
-          'shorts': [],
-          'notes': [],
-        }
+        'bookmarks': {'shorts': [], 'notes': []}
       });
     }
 
     final currentBookmarks = (userDoc.data()?['bookmarks']?['shorts'] ?? []) as List<dynamic>;
-
     if (currentBookmarks.contains(shortId)) {
-      await userDocRef.update({
-        'bookmarks.shorts': FieldValue.arrayRemove([shortId])
-      });
+      await userDocRef.update({'bookmarks.shorts': FieldValue.arrayRemove([shortId])});
     } else {
-      await userDocRef.update({
-        'bookmarks.shorts': FieldValue.arrayUnion([shortId])
-      });
+      await userDocRef.update({'bookmarks.shorts': FieldValue.arrayUnion([shortId])});
     }
+  }
+
+  String _formatDuration(Duration d) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(d.inMinutes.remainder(60));
+    final seconds = twoDigits(d.inSeconds.remainder(60));
+    return "$minutes:$seconds";
   }
 
   @override
@@ -201,6 +186,7 @@ class _ShortViewerPageState extends State<ShortViewerPage> {
           final data = widget.docs[index].data() as Map<String, dynamic>;
           final docId = widget.docs[index].id;
           final description = data['description'] ?? '';
+          final teacherName = data['teacherName'] ?? 'Unknown Teacher';
           final controller = _videoControllers[index];
 
           if (controller == null || !controller.value.isInitialized) {
@@ -216,117 +202,52 @@ class _ShortViewerPageState extends State<ShortViewerPage> {
               final upvotes = (snapData['upvotes'] ?? 0) as int;
               final downvotes = (snapData['downvotes'] ?? 0) as int;
 
-              return StreamBuilder<DocumentSnapshot>(
-                stream: db.collection('users').doc(userId).snapshots(),
-                builder: (context, userSnap) {
-                  final bookmarksData = userSnap.data?.data() as Map<String, dynamic>? ?? {};
-                  final shortsList = (bookmarksData['bookmarks']?['shorts'] ?? []) as List<dynamic>;
-                  final isBookmarked = shortsList.contains(docId);
-
-                  return GestureDetector(
-                    onTap: _toggleControls,
-                    child: Stack(
-                      children: [
-                        Center(
-                          child: AspectRatio(
-                            aspectRatio: controller.value.aspectRatio,
-                            child: VideoPlayer(controller),
-                          ),
-                        ),
-                        if (_showControls) ...[
-                          Center(
-                            child: IconButton(
-                              iconSize: 64,
-                              icon: Icon(controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle, color: Colors.white),
-                              onPressed: _togglePlayPause,
-                            ),
-                          ),
-                          Positioned(
-                            bottom: 100,
-                            left: 20,
-                            right: 20,
-                            child: Column(
-                              children: [
-                                Slider(
-                                  min: 0.0,
-                                  max: totalDuration > 0 ? totalDuration : 1.0,
-                                  value: (_isSeeking
-                                          ? _sliderValue
-                                          : controller.value.position.inMilliseconds.toDouble())
-                                      .clamp(0.0, totalDuration),
-                                  onChangeStart: (val) {
-                                    setState(() {
-                                      _isSeeking = true;
-                                      _sliderValue = val;
-                                    });
-                                  },
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _sliderValue = value;
-                                    });
-                                  },
-                                  onChangeEnd: (value) {
-                                    controller.seekTo(Duration(milliseconds: value.toInt()));
-                                    setState(() {
-                                      _isSeeking = false;
-                                    });
-                                  },
-                                ),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      _formatDuration(controller.value.position),
-                                      style: const TextStyle(color: Colors.white, fontSize: 11),
-                                    ),
-                                    Text(
-                                      _formatDuration(controller.value.duration),
-                                      style: const TextStyle(color: Colors.white, fontSize: 11),
-                                    ),
-                                  ],
-                                )
-                              ],
-                            ),
-                          ),
-                        ],
-                        Positioned(
-                          bottom: 150,
-                          right: 20,
-                          child: Column(
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.arrow_upward, color: Colors.white, size: 30),
-                                onPressed: () => _vote(docId, 'upvote'),
-                              ),
-                              Text("$upvotes", style: const TextStyle(color: Colors.white)),
-                              const SizedBox(height: 8),
-                              IconButton(
-                                icon: const Icon(Icons.arrow_downward, color: Colors.white, size: 30),
-                                onPressed: () => _vote(docId, 'downvote'),
-                              ),
-                              Text("$downvotes", style: const TextStyle(color: Colors.white)),
-                              const SizedBox(height: 8),
-                              IconButton(
-                                icon: Icon(
-                                  isBookmarked ? Icons.bookmark : Icons.bookmark_outline,
-                                  color: Colors.white,
-                                  size: 30,
-                                ),
-                                onPressed: () => _toggleBookmark(userId, docId),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 20,
-                          left: 20,
-                          right: 20,
-                          child: Text(description, style: const TextStyle(color: Colors.white, fontSize: 14)),
-                        ),
-                      ],
+              return GestureDetector(
+                onTap: _toggleControls,
+                child: Stack(
+                  children: [
+                    Center(
+                      child: AspectRatio(
+                        aspectRatio: controller.value.aspectRatio,
+                        child: VideoPlayer(controller),
+                      ),
                     ),
-                  );
-                },
+                    if (_showControls)
+                      Center(
+                        child: IconButton(
+                          iconSize: 64,
+                          icon: Icon(controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle, color: Colors.white),
+                          onPressed: _togglePlayPause,
+                        ),
+                      ),
+                    Positioned(
+                      right: 16,
+                      bottom: 120,
+                      child: Column(
+                        children: [
+                          _buildActionButton(Icons.arrow_upward, () => _vote(docId, 'upvote'), upvotes),
+                          const SizedBox(height: 12),
+                          _buildActionButton(Icons.arrow_downward, () => _vote(docId, 'downvote'), downvotes),
+                          const SizedBox(height: 12),
+                          _buildActionButton(Icons.bookmark, () => _toggleBookmark(docId), null),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 20,
+                      left: 16,
+                      right: 16,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(description, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                          const SizedBox(height: 8),
+                          Text('@$teacherName', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                        ],
+                      ),
+                    )
+                  ],
+                ),
               );
             },
           );
@@ -335,10 +256,26 @@ class _ShortViewerPageState extends State<ShortViewerPage> {
     );
   }
 
-  String _formatDuration(Duration d) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final minutes = twoDigits(d.inMinutes.remainder(60));
-    final seconds = twoDigits(d.inSeconds.remainder(60));
-    return "$minutes:$seconds";
+  Widget _buildActionButton(IconData icon, VoidCallback onTap, int? count) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.2),
+            ),
+            child: Icon(icon, color: Colors.white, size: 30),
+          ),
+        ),
+        if (count != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text('$count', style: const TextStyle(color: Colors.white, fontSize: 12)),
+          )
+      ],
+    );
   }
 }
