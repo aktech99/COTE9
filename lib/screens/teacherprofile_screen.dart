@@ -11,10 +11,13 @@ class TeacherProfileScreen extends StatefulWidget {
 }
 
 class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
+  // Teacher profile variables
   String teacherName = '';
   String email = '';
+  String role = 'Teacher';
   List<String> subjects = [];
-  
+
+  // Shorts performance metrics
   int shortsUpvotes = 0;
   int shortsDownvotes = 0;
   int shortsCount = 0;
@@ -60,6 +63,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
           databaseId: "cote",
         );
 
+        // Fetch total upvotes and downvotes across all shorts for this teacher
         final shortsQuery = await firestore
             .collection('shorts')
             .where('teacherId', isEqualTo: user.uid)
@@ -146,7 +150,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Profile'),
+        title: const Text('Teacher Profile'),
         backgroundColor: Colors.deepPurple,
       ),
       body: SingleChildScrollView(
@@ -246,6 +250,9 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
               // Subjects Card
               Card(
                 elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -262,30 +269,40 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.add),
+                            icon: const Icon(Icons.add_circle, color: Colors.deepPurple),
                             onPressed: _addSubject,
                           ),
                         ],
                       ),
                       const SizedBox(height: 10),
-                     Wrap(
-  spacing: 8,
-  runSpacing: 8,
-  children: subjects.map((subject) {
-    return Chip(
-      label: Text(
-        subject,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      backgroundColor: Colors.deepPurple,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-    );
-  }).toList(),
-),
-
+                      subjects.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No subjects added yet',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        )
+                      : Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: subjects.map((subject) {
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: Colors.deepPurple.shade50,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.deepPurple.shade100, width: 1),
+                              ),
+                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              child: Text(
+                                subject,
+                                style: TextStyle(
+                                  color: Colors.deepPurple.shade800,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
                     ],
                   ),
                 ),
