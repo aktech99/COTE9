@@ -18,6 +18,29 @@ class LeaderboardPageState extends State<LeaderboardPage> {
 
   final User? _currentUser = FirebaseAuth.instance.currentUser;
 
+  // Rank color based on position
+  Color _getRankColor(int rank) {
+    switch (rank) {
+      case 1:
+        return const Color(0xFFFFD700); // Gold color
+      case 2:
+        return const Color(0xFFC0C0C0); // Silver color
+      case 3:
+        return const Color(0xFFCD7F32); // Bronze color
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // Rating color coding
+  Color _getRatingColor(int rating) {
+    if (rating < 1000) return Colors.red;
+    if (rating < 1200) return Colors.orange;
+    if (rating < 1400) return Colors.blue;
+    if (rating < 1600) return Colors.green;
+    return Colors.purple;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -52,6 +75,9 @@ class LeaderboardPageState extends State<LeaderboardPage> {
             );
           }
 
+          // Debug print to understand current user details
+          print('Current User UID: ${_currentUser?.uid}');
+
           // Filter and prepare student users
           final studentUsers = snapshot.data!.docs.where((doc) {
             final userData = doc.data() as Map<String, dynamic>;
@@ -63,13 +89,18 @@ class LeaderboardPageState extends State<LeaderboardPage> {
             itemBuilder: (context, index) {
               var userData = studentUsers[index].data() as Map<String, dynamic>;
               
+              // Debug print for each user
+              print('User UID: ${userData['uid']}');
+              print('Username: ${userData['username']}');
+
               return _buildLeaderboardItem(
                 rank: index + 1,
                 username: userData['username'] ?? 'Unknown User',
                 rating: userData['quizRating'] ?? 1200,
                 battlesWon: userData['quizBattlesWon'] ?? 0,
                 totalBattles: userData['quizBattlesPlayed'] ?? 0,
-                isCurrentUser: userData['username'] == _currentUser?.displayName,
+                // Change to compare UIDs instead of usernames
+                isCurrentUser: userData['uid'] == _currentUser?.uid,
               );
             },
           );
@@ -86,15 +117,32 @@ class LeaderboardPageState extends State<LeaderboardPage> {
     required int totalBattles,
     required bool isCurrentUser,
   }) {
+    // Debug print to verify current user highlight
+    print('Is Current User: $isCurrentUser for $username');
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: isCurrentUser ? Colors.deepPurple.withOpacity(0.3) : Colors.white10,
+        color: Colors.black45,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isCurrentUser ? Colors.deepPurple : Colors.white24, 
-          width: isCurrentUser ? 2 : 1,
-        ),
+        border: isCurrentUser
+          ? Border.all(
+              color: Colors.deepPurple.shade300,
+              width: 2,
+            )
+          : Border.all(
+              color: Colors.white24,
+              width: 1,
+            ),
+        boxShadow: isCurrentUser
+          ? [
+              BoxShadow(
+                color: Colors.deepPurple.withOpacity(0.3),
+                blurRadius: 5,
+                spreadRadius: 1,
+              )
+            ]
+          : [],
       ),
       child: ListTile(
         leading: CircleAvatar(
@@ -114,7 +162,9 @@ class LeaderboardPageState extends State<LeaderboardPage> {
               child: Text(
                 username,
                 style: TextStyle(
-                  color: isCurrentUser ? Colors.deepPurple : Colors.white,
+                  color: isCurrentUser 
+                    ? Colors.white 
+                    : Colors.white70,
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
@@ -132,34 +182,13 @@ class LeaderboardPageState extends State<LeaderboardPage> {
         ),
         subtitle: Text(
           'Battles: $battlesWon/$totalBattles',
-          style: const TextStyle(
-            color: Colors.white70,
+          style: TextStyle(
+            color: isCurrentUser 
+              ? Colors.white 
+              : Colors.white54,
           ),
         ),
       ),
     );
-  }
-
-  // Rank color based on position
-  Color _getRankColor(int rank) {
-    switch (rank) {
-      case 1:
-        return const Color(0xFFFFD700); // Gold color
-      case 2:
-        return const Color(0xFFC0C0C0); // Silver color
-      case 3:
-        return const Color(0xFFCD7F32); // Bronze color
-      default:
-        return Colors.grey;
-    }
-  }
-
-  // Rating color coding
-  Color _getRatingColor(int rating) {
-    if (rating < 1000) return Colors.red;
-    if (rating < 1200) return Colors.orange;
-    if (rating < 1400) return Colors.blue;
-    if (rating < 1600) return Colors.green;
-    return Colors.purple;
   }
 }
