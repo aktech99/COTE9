@@ -20,7 +20,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Quiz Battle Metrics
   int quizBattlesPlayed = 0;
   int quizBattlesWon = 0;
-  int totalPointsEarned = 0;
+  int quizRating = 1500; // Starting ELO rating
 
   final firestore = FirebaseFirestore.instanceFor(
     app: Firebase.app(),
@@ -30,27 +30,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserProfile();
-    _fetchUserMetrics();
+    _loadUserProfile().then((_) => _fetchUserMetrics());
   }
 
   Future<void> _loadUserProfile() async {
-    final doc = await firestore.collection('users').doc(_currentUser!.uid).get();
-    setState(() {
-      _userData = doc.data();
-      _isLoading = false;
-    });
+    try {
+      final doc = await firestore.collection('users').doc(_currentUser!.uid).get();
+      setState(() {
+        _userData = doc.data();
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading user profile: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchUserMetrics() async {
     try {
+      final doc = await firestore.collection('users').doc(_currentUser!.uid).get();
       setState(() {
-        quizBattlesPlayed = _userData?['quizBattlesPlayed'] ?? 0;
-        quizBattlesWon = _userData?['quizBattlesWon'] ?? 0;
-        totalPointsEarned = _userData?['totalPointsEarned'] ?? 0;
+        quizBattlesPlayed = doc.data()?['quizBattlesPlayed'] ?? 0;
+        quizBattlesWon = doc.data()?['quizBattlesWon'] ?? 0;
+        quizRating = doc.data()?['quizRating'] ?? 1500;
+        _isLoading = false;
       });
     } catch (e) {
       print('Error fetching user metrics: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // ELO Rating Calculation Method
+  int calculateELOrating(int currentRating, bool won, int opponentRating) {
+    // ELO constant (K-factor)
+    const int k = 32;
+
+    // Calculate expected score
+    double expectedScore = 1 / (1 + pow(10, (opponentRating - currentRating) / 400));
+
+    // Actual score (1 for win, 0 for loss)
+    double actualScore = won ? 1.0 : 0.0;
+
+    // Calculate new rating
+    int newRating = (currentRating + k * (actualScore - expectedScore)).round();
+
+    // Prevent rating from going below 0
+    return max(newRating, 0);
+  }
+
+  // Method to update quiz metrics and ELO rating
+  Future<void> updateQuizMetrics({
+    required bool wonBattle, 
+    required int opponentRating
+  }) async {
+    try {
+      final userRef = firestore.collection('users').doc(_currentUser!.uid);
+      
+      // Calculate new rating
+      int newRating = calculateELOrating(quizRating, wonBattle, opponentRating);
+
+      await userRef.update({
+        'quizBattlesPlayed': FieldValue.increment(1),
+        'quizBattlesWon': wonBattle ? FieldValue.increment(1) : FieldValue.increment(0),
+        'quizRating': newRating,
+      });
+
+      // Refresh metrics
+      _fetchUserMetrics();
+    } catch (e) {
+      print('Error updating quiz metrics: $e');
     }
   }
 
@@ -58,22 +111,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final newSubject = _subjectController.text.trim();
     if (newSubject.isEmpty) return;
 
-    final updatedSubjects = [..._userData!['subjects'], newSubject];
-    await firestore.collection('users').doc(_currentUser!.uid).update({
-      'subjects': updatedSubjects,
-    });
-    _subjectController.clear();
-    _loadUserProfile();
+    try {
+      final updatedSubjects = [...?_userData?['subjects'], newSubject];
+      await firestore.collection('users').doc(_currentUser!.uid).update({
+        'subjects': updatedSubjects,
+      });
+      _subjectController.clear();
+      _loadUserProfile();
+    } catch (e) {
+      print('Error adding subject: $e');
+    }
   }
 
   Future<void> _removeSubject(String subject) async {
-    final updatedSubjects = List<String>.from(_userData!['subjects']);
-    updatedSubjects.remove(subject);
+    try {
+      final updatedSubjects = List<String>.from(_userData!['subjects']);
+      updatedSubjects.remove(subject);
 
-    await firestore.collection('users').doc(_currentUser!.uid).update({
-      'subjects': updatedSubjects,
-    });
-    _loadUserProfile();
+      await firestore.collection('users').doc(_currentUser!.uid).update({
+        'subjects': updatedSubjects,
+      });
+      _loadUserProfile();
+    } catch (e) {
+      print('Error removing subject: $e');
+    }
   }
 
   @override
@@ -166,10 +227,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             label: 'Battles Won',
                           ),
                           _buildMetricItem(
-                            icon: Icons.star,
+                            icon: Icons.star_rate,
                             color: Colors.orange,
-                            value: totalPointsEarned.toString(),
-                            label: 'Total Points',
+                            value: quizRating.toString(),
+                            label: 'Quiz Rating',
                           ),
                         ],
                       ),
